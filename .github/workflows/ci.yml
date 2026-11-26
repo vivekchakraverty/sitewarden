@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    env:
+      SITEWARDEN_SKIP_ELECTRON: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  package:
+    name: Package Windows installer
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --win --publish never
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $f = Get-ChildItem release -Filter 'SiteWarden-Setup-*.exe' | Select-Object -First 1
+          if (-not $f) { throw 'installer not found' }
+          $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+          "$h  $($f.Name)" | Out-File -Encoding ascii "$($f.FullName).sha256"
+          "**$($f.Name)**: $([math]::Round($f.Length / 1MB, 1)) MB, SHA-256 ``$h``" >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SiteWarden-installer-${{ github.sha }}
+          path: |
+            release/SiteWarden-Setup-*.exe
+            release/SiteWarden-Setup-*.exe.sha256
+          retention-days: 7
+          if-no-files-found: error

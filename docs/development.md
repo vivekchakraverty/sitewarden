@@ -60,8 +60,19 @@ scripts/test/         test suites, fake D1, fake Docker, e2e harness
 
 `npm run e2e:deep` uses the real installed tools. The last run found 5 Nuclei findings in 12.6 minutes and 6 ZAP findings in 29 seconds.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request:
+
+| Job | Runner | Does |
+|---|---|---|
+| Typecheck and tests | Windows and Ubuntu | `npm ci` (with `SITEWARDEN_SKIP_ELECTRON=1`, so the Electron binary isn't downloaded), `npm run typecheck`, `npm test` (Python 3.12 for the VM agent suite) |
+| Package Windows installer | Windows | builds the NSIS installer and uploads it with its SHA-256 as a 7-day artifact |
+
+`npm run e2e:deep` isn't run in CI because it needs the real Nuclei, ZAP and Java installs.
+
 ## Releasing
 
-1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry.
-2. `npm run typecheck && npm test && npm run build:win`.
-3. Tag `vX.Y.Z` and create a GitHub release with `release/SiteWarden-Setup-X.Y.Z.exe` and its SHA-256.
+1. Bump `version` in `package.json` and add a `## X.Y.Z` section to `CHANGELOG.md`.
+2. Commit, then tag and push: `git tag -a vX.Y.Z -m "SiteWarden X.Y.Z" && git push --follow-tags`.
+3. `.github/workflows/release.yml` checks the tag matches `package.json`, runs typecheck and tests, builds the installer, and creates the GitHub release. The notes come from that version's changelog section, plus the installer's SHA-256. If the release already exists, only the installer is replaced. To rebuild an existing tag, run the workflow by hand (*Actions › Release › Run workflow*).

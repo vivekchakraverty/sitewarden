@@ -1,0 +1,80 @@
+name: Release
+
+# Push a tag like v0.2.0 (matching package.json "version") to build and publish.
+# Run it by hand with an existing tag to rebuild and replace that release's installer.
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build, e.g. v0.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Tag must match package.json version
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$v" -ne $env:TAG) { throw "Tag $env:TAG does not match package.json version $v" }
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npx electron-builder --win --publish never
+
+      - name: Publish to GitHub release
+        shell: pwsh
+        run: |
+          $v = $env:TAG.TrimStart('v')
+          $exe = "release/SiteWarden-Setup-$v.exe"
+          if (-not (Test-Path $exe)) { throw "missing $exe" }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  SiteWarden-Setup-$v.exe" | Out-File -Encoding ascii "$exe.sha256"
+
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # Release exists (e.g. written by hand): replace the installer, keep the notes.
+            gh release upload $env:TAG $exe "$exe.sha256" --clobber
+          } else {
+            # Notes: this version's CHANGELOG section plus the checksum.
+            $log = Get-Content CHANGELOG.md -Raw
+            $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($v))\b.*?(?=^## |\z)")
+            $section = if ($m.Success) { $m.Value.Trim() } else { "SiteWarden $v" }
+            @"
+          $section
+
+          ## Download
+
+          **SiteWarden-Setup-$v.exe** (Windows x64). SHA-256: ``$hash``
+
+          The installer isn't code-signed; if SmartScreen warns, choose More info > Run anyway.
+          "@ | Out-File -Encoding utf8 notes.md
+            gh release create $env:TAG $exe "$exe.sha256" --title "SiteWarden $v" --notes-file notes.md --verify-tag
+          }
+          "Published $env:TAG, SHA-256 ``$hash``" >> $env:GITHUB_STEP_SUMMARY
