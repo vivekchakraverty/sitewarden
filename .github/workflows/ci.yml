@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    env:
+      SITEWARDEN_SKIP_ELECTRON: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  package:
+    name: Package (${{ matrix.name }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest, flag: --win }
+          - { name: macos, os: macos-latest, flag: --mac }
+          - { name: linux, os: ubuntu-latest, flag: --linux }
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false' # no signing certificates in CI yet
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder ${{ matrix.flag }} --publish never
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem release -File | Where-Object { $_.Name -match '^SiteWarden-.*\.(exe|dmg|AppImage|deb)$' }
+          if (-not $files) { throw 'no installers found in release/' }
+          foreach ($f in $files) {
+            $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($f.Name)" | Out-File -Encoding ascii "$($f.FullName).sha256"
+            "**$($f.Name)**: $([math]::Round($f.Length / 1MB, 1)) MB, SHA-256 ``$h``" >> $env:GITHUB_STEP_SUMMARY
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SiteWarden-${{ matrix.name }}-${{ github.sha }}
+          path: |
+            release/SiteWarden-*.exe
+            release/SiteWarden-*.dmg
+            release/SiteWarden-*.AppImage
+            release/SiteWarden-*.deb
+            release/SiteWarden-*.sha256
+          retention-days: 7
+          if-no-files-found: error

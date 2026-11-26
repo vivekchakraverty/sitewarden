@@ -2,13 +2,21 @@
 
 ## 1. Install
 
-Download `SiteWarden-Setup-<version>.exe` from [Releases](https://github.com/vivekchakraverty/sitewarden/releases) and run it. The installer is per-user and needs no administrator rights.
-
-The 0.1.0 installer isn't code-signed. If Windows SmartScreen shows "Windows protected your PC", click **More info › Run anyway**. You can check the download against the SHA-256 listed on the release page:
+Download the file for your system from [Releases](https://github.com/vivekchakraverty/sitewarden/releases) and check it against its `.sha256`:
 
 ```powershell
-Get-FileHash .\SiteWarden-Setup-0.1.0.exe -Algorithm SHA256
+# Windows (PowerShell)
+Get-FileHash .\SiteWarden-Setup-<version>.exe -Algorithm SHA256
 ```
+
+```bash
+# macOS / Linux
+shasum -a 256 SiteWarden-<version>-mac-arm64.dmg      # or: sha256sum SiteWarden-<version>-linux-amd64.deb
+```
+
+- **Windows:** run the `.exe` (per-user install, no admin rights). If SmartScreen shows "Windows protected your PC", click **More info › Run anyway**.
+- **macOS:** open the `.dmg` (`arm64` for Apple Silicon, `x64` for Intel) and drag SiteWarden to Applications. The app isn't notarized yet, so the first time **right-click it › Open › Open**. If macOS says it "is damaged", run `xattr -cr /Applications/SiteWarden.app` once.
+- **Linux:** `sudo apt install ./SiteWarden-<version>-linux-amd64.deb`, or make the AppImage executable (`chmod +x SiteWarden-*.AppImage`) and run it. On Ubuntu 24.04, prefer the `.deb`. A keyring (GNOME Keyring or KWallet) is needed to store API keys.
 
 ### First launch
 
@@ -22,7 +30,7 @@ About 3 seconds after the first launch, SiteWarden starts setting up the deep-sc
 
 A banner shows progress. You can keep using the app or click **Stop**. The first template download can take 10–15 minutes on Windows. To turn automatic setup off, go to **Deep scanners › Settings**.
 
-OWASP ZAP itself isn't downloaded because it has its own installer. Get it from [zaproxy.org/download](https://www.zaproxy.org/download/) if you want ZAP baseline scans.
+OWASP ZAP itself isn't downloaded because it has its own installer. Get it from [zaproxy.org/download](https://www.zaproxy.org/download/) if you want ZAP baseline scans. SiteWarden finds it in the default install location on each OS (`C:\Program Files\ZAP\…`, `/Applications/ZAP.app`, `/usr/share/zaproxy` or `/opt/zaproxy`), or you can choose its folder.
 
 ## 2. Add and verify a domain
 
@@ -43,7 +51,7 @@ Under **API keys**, paste any of these free keys to turn on malware and blacklis
 | VirusTotal | [Sign up](https://www.virustotal.com/gui/join-us), then Profile › API key | about 4 lookups/minute, 500/day |
 | abuse.ch (URLhaus) | [auth.abuse.ch](https://auth.abuse.ch/): generate an Auth-Key | free |
 
-Keys are encrypted with your operating system's key store (Windows DPAPI or macOS Keychain) and are only ever sent to their own service.
+Keys are encrypted with your operating system's key store (Windows DPAPI, macOS Keychain, or GNOME Keyring/KWallet on Linux) and are only ever sent to their own service.
 
 ## 4. Run a scan
 

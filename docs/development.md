@@ -11,7 +11,9 @@ npm run typecheck
 npm test             # phase 2–4 suites, no network
 npm run smoke -- yourdomain.com   # passive quick checks from the CLI
 npm run e2e:deep     # real Nuclei + ZAP against a vulnerable HTTPS site on localhost:8443 (needs openssl)
-npm run build:win    # NSIS installer in release/
+npm run build:win    # Windows NSIS installer in release/
+npm run build:mac    # macOS .dmg for arm64 and x64 (run on a Mac)
+npm run build:linux  # Linux AppImage and .deb (run on Linux)
 ```
 
 If `npm run dev` reports "Electron uninstall", run `node node_modules/electron/install.js`.
@@ -60,8 +62,21 @@ scripts/test/         test suites, fake D1, fake Docker, e2e harness
 
 `npm run e2e:deep` uses the real installed tools. The last run found 5 Nuclei findings in 12.6 minutes and 6 ZAP findings in 29 seconds.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request:
+
+| Job | Runner | Does |
+|---|---|---|
+| Typecheck and tests | Windows, macOS and Ubuntu | `npm ci` (with `SITEWARDEN_SKIP_ELECTRON=1`, so the Electron binary isn't downloaded), `npm run typecheck`, `npm test` (Python 3.12 for the VM agent suite) |
+| Package | Windows, macOS, Ubuntu | builds `.exe`, `.dmg` (arm64 + x64) and `.AppImage` + `.deb`, and uploads them with SHA-256 files as 7-day artifacts |
+
+`npm run e2e:deep` isn't run in CI because it needs the real Nuclei, ZAP and Java installs.
+
 ## Releasing
 
-1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry.
-2. `npm run typecheck && npm test && npm run build:win`.
-3. Tag `vX.Y.Z` and create a GitHub release with `release/SiteWarden-Setup-X.Y.Z.exe` and its SHA-256.
+1. Bump `version` in `package.json` and add a `## X.Y.Z` section to `CHANGELOG.md`.
+2. Commit, then tag and push: `git tag -a vX.Y.Z -m "SiteWarden X.Y.Z" && git push --follow-tags`.
+3. `.github/workflows/release.yml` checks the tag matches `package.json` and creates the GitHub release, with notes from that version's changelog section and a downloads table. It then builds on Windows, macOS and Linux in parallel; each build runs typecheck and tests, then uploads its installers and `.sha256` files. If the release already exists, only the files are replaced. To rebuild an existing tag, run the workflow by hand (*Actions › Release › Run workflow*).
+
+Code signing isn't configured. macOS builds are ad-hoc signed (`mac.identity: "-"`) so they run on Apple Silicon, but they aren't notarized.

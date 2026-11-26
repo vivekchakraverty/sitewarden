@@ -34,9 +34,11 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "build:win": "npm run build && electron-builder --win",
     "smoke": "esbuild scripts/smoke.ts --bundle --platform=node --outfile=out/smoke.cjs --log-level=warning && node out/smoke.cjs",
-    "postinstall": "node node_modules/electron/install.js",
+    "postinstall": "node scripts/postinstall.mjs",
     "test": "node scripts/test/run.mjs",
-    "e2e:deep": "node scripts/test/run.mjs deep-e2e"
+    "e2e:deep": "node scripts/test/run.mjs deep-e2e",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux"
   },
   "build": {
     "appId": "app.sitewarden.desktop",
@@ -52,6 +54,43 @@
     },
     "nsis": {
       "artifactName": "SiteWarden-Setup-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": "-",
+      "artifactName": "SiteWarden-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "SiteWarden ${version}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network",
+      "synopsis": "Bring-your-own-key website security scanner",
+      "maintainer": "vivekchakraverty <vivekchakraverty@users.noreply.github.com>",
+      "artifactName": "SiteWarden-${version}-linux-${arch}.${ext}"
     }
   },
   "dependencies": {

@@ -40,7 +40,12 @@ export default function Settings(): React.JSX.Element {
         These free services power the malware and blacklist checks. Each key is encrypted with your operating system's key store and only sent to
         its own service. Checks without a key are skipped.
       </p>
-      {!encOk && <div className="error">OS encryption is unavailable on this system, so keys cannot be stored safely.</div>}
+      {!encOk && (
+        <div className="error">
+          Your system has no secure key store, so keys can't be saved safely. On Linux, install and unlock GNOME Keyring or KWallet (for example{' '}
+          <code>sudo apt install gnome-keyring</code>), then restart SiteWarden.
+        </div>
+      )}
       {keys.map((k) => (
         <section key={k.name} className="card">
           <div className="row">
