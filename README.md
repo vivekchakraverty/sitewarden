@@ -22,11 +22,26 @@ SiteWarden only scans domains you've **proved you own** with a DNS TXT record or
 
 ## Install
 
-1. Download `SiteWarden-Setup-0.1.0.exe` from the [latest release](https://github.com/vivekchakraverty/sitewarden/releases/latest).
-2. Run it. The installer isn't code-signed yet, so Windows SmartScreen may warn you: choose **More info › Run anyway**.
-3. On first launch, SiteWarden downloads the deep-scan tools in the background (about 85 MB, checksum-verified). You can stop this and install them later from **Deep scanners**.
+Download the file for your system from the [latest release](https://github.com/vivekchakraverty/sitewarden/releases/latest). Each file has a matching `.sha256` you can check it against.
 
-macOS and Linux can run it from source (see [Development](docs/development.md)); packaged builds for them aren't published yet.
+| System | File | First run |
+|---|---|---|
+| **Windows** 10/11 (x64) | `SiteWarden-Setup-<version>.exe` | SmartScreen may warn because the installer isn't code-signed yet: **More info › Run anyway** |
+| **macOS** Apple Silicon | `SiteWarden-<version>-mac-arm64.dmg` | drag to Applications, then **right-click › Open** the first time (see below) |
+| **macOS** Intel | `SiteWarden-<version>-mac-x64.dmg` | same as above |
+| **Linux** (x64) | `SiteWarden-<version>-linux-amd64.deb` (Debian/Ubuntu) or `…-linux-x86_64.AppImage` | `sudo apt install ./SiteWarden-*.deb`, or `chmod +x` the AppImage and run it |
+
+**macOS:** the app is ad-hoc signed but not notarized, so Gatekeeper blocks a plain double-click. Right-click the app in Applications and choose **Open**, then **Open** again. If macOS says the app "is damaged", clear the download flag with:
+
+```bash
+xattr -cr /Applications/SiteWarden.app
+```
+
+**Linux:** SiteWarden stores keys in your desktop keyring (GNOME Keyring or KWallet). Without one it refuses to save keys instead of storing them weakly. On Ubuntu 24.04, use the `.deb`: AppImages can trip over Ubuntu's AppArmor sandbox rules.
+
+On first launch, SiteWarden downloads the deep-scan tools for your platform in the background (about 85 MB, checksum-verified). You can stop this and install them later from **Deep scanners**.
+
+> macOS and Linux packages start with the next release. 0.1.0 shipped for Windows only; until then, macOS and Linux can [run from source](docs/development.md).
 
 ## Quick start
 

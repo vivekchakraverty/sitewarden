@@ -45,13 +45,24 @@ function read(): Stored {
 
 function write(s: Stored): void {
   const tmp = `${path()}.tmp`
-  writeFileSync(tmp, JSON.stringify(s, null, 2), 'utf8')
+  writeFileSync(tmp, JSON.stringify(s, null, 2), { encoding: 'utf8', mode: 0o600 })
   renameSync(tmp, path())
 }
 
 export function encryptionAvailable(): boolean {
-  return safeStorage.isEncryptionAvailable()
+  if (!safeStorage.isEncryptionAvailable()) return false
+  // On Linux without a keyring, Electron falls back to a hard-coded key ("basic_text"), which isn't real protection.
+  if (process.platform === 'linux') {
+    const backend = (safeStorage as { getSelectedStorageBackend?: () => string }).getSelectedStorageBackend?.()
+    if (backend === 'basic_text') return false
+  }
+  return true
 }
+
+export const ENCRYPTION_HELP =
+  process.platform === 'linux'
+    ? 'No system keyring was found, so keys cannot be stored safely. Install and unlock GNOME Keyring or KWallet (for example: sudo apt install gnome-keyring), then restart SiteWarden.'
+    : 'OS encryption is not available, so the key was not saved.'
 
 export function listKeys(): KeyInfo[] {
   const s = read()
@@ -71,7 +82,7 @@ export function setSecret(name: SecretName, value: string): void {
   const trimmed = value.trim()
   if (!trimmed) throw new Error('Key is empty')
   if (!encryptionAvailable()) {
-    throw new Error('OS encryption is not available, so the key was not saved.')
+    throw new Error(ENCRYPTION_HELP)
   }
   const s = read()
   s[name] = safeStorage.encryptString(trimmed).toString('base64')

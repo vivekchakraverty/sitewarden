@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- macOS (`.dmg` for Apple Silicon and Intel) and Linux (`.AppImage`, `.deb`) packages, built by CI on each OS.
+- CI runs typecheck and tests on Windows, macOS and Linux, and packages all three. Tagged releases publish every installer with a `.sha256`.
+- On macOS, uses the Java bundled with `ZAP.app` before downloading one.
+
+### Fixed
+- Nuclei and the private Java runtime are marked executable after extraction on macOS and Linux.
+- On Linux without a keyring, keys are no longer stored with Electron's weak "basic_text" fallback; the app explains how to enable GNOME Keyring or KWallet instead.
+- The keys file is written owner-only (0600).
+- Only one copy of the app runs at a time.
+
 ## 0.1.0 (2026-11-26)
 
 First public release.

@@ -4,7 +4,7 @@
 //  - OWASP ZAP: detected from the usual install folders or chosen by the user (not downloaded: it has its own installer)
 import { app } from 'electron'
 import { spawn } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
 import type { ScannerSettings, ToolProgress, ToolsStatus } from '../../shared/types'
 import { store } from '../store'
@@ -160,6 +160,11 @@ function javaCandidates(): string[] {
     const cfg = join(zap.dir, '.install4j', 'inst_jre.cfg')
     if (existsSync(cfg)) c.push(join(readFileSync(cfg, 'utf8').trim(), 'bin', exe('java')))
   }
+  if (zap.dir && process.platform === 'darwin') {
+    // The macOS ZAP.app bundles its own Java under Contents/PlugIns.
+    const plugins = join(zap.dir, '..', 'PlugIns')
+    if (existsSync(plugins)) for (const d of readdirSync(plugins)) c.push(join(plugins, d, 'Contents', 'Home', 'bin', 'java'))
+  }
   if (process.env.JAVA_HOME) c.push(join(process.env.JAVA_HOME, 'bin', exe('java')))
   const roots =
     process.platform === 'win32'
@@ -230,6 +235,7 @@ export async function installJava(progress: (p: ToolProgress) => void, signal?: 
   else extractTarGz(buf, dest)
   const java = findFile(dest, exe('java'), 5)
   if (!java) throw new Error('Java was downloaded but its executable was not found.')
+  if (process.platform !== 'win32') chmodSync(java, 0o755)
   const version = await javaVersion(java)
   if (!version || version < 17) throw new Error('The downloaded Java did not start.')
   save({ ...saved(), java: { path: java, version } })
@@ -324,6 +330,8 @@ export async function installNuclei(progress: (p: ToolProgress) => void, signal?
   extractZip(buf, dest)
   const bin = join(dest, exe('nuclei'))
   if (!existsSync(bin)) throw new Error('Nuclei was downloaded but the executable was not in the archive.')
+  // Zip entries don't always carry Unix permissions; make sure the binary can run on macOS/Linux.
+  if (process.platform !== 'win32') chmodSync(bin, 0o755)
   const v = await run(bin, ['-version', '-duc'], { timeoutMs: 30000 })
   if (!/Nuclei Engine Version/i.test(v.stderr + v.stdout)) throw new Error(`Nuclei did not start: ${(v.stderr || v.stdout).slice(0, 300)}`)
   save({ ...saved(), nuclei: { version, path: bin } })

@@ -1,14 +1,15 @@
 name: Release
 
-# Push a tag like v0.2.0 (matching package.json "version") to build and publish.
-# Run it by hand with an existing tag to rebuild and replace that release's installer.
+# Push a tag like v0.2.0 (matching package.json "version") to build and publish
+# Windows, macOS and Linux installers. Run it by hand with an existing tag to
+# rebuild and replace that release's installers.
 on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to build, e.g. v0.1.0'
+        description: 'Existing tag to build, e.g. v0.2.0'
         required: true
 
 permissions:
@@ -18,12 +19,62 @@ concurrency:
   group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  GH_TOKEN: ${{ github.token }}
+
 jobs:
-  release:
-    runs-on: windows-latest
+  prepare:
+    name: Check version and create release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Tag must match package.json version
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$v" -ne $env:TAG) { throw "Tag $env:TAG does not match package.json version $v" }
+      - name: Create the release if it doesn't exist
+        shell: pwsh
+        run: |
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) { "Release $env:TAG exists; installers will be replaced." >> $env:GITHUB_STEP_SUMMARY; exit 0 }
+          $v = $env:TAG.TrimStart('v')
+          $log = Get-Content CHANGELOG.md -Raw
+          $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($v))\b.*?(?=^## |\z)")
+          $section = if ($m.Success) { $m.Value.Trim() } else { "SiteWarden $v" }
+          @"
+          $section
+
+          ## Downloads
+
+          | Platform | File |
+          |---|---|
+          | Windows 10/11 (x64) | ``SiteWarden-Setup-$v.exe`` |
+          | macOS, Apple Silicon | ``SiteWarden-$v-mac-arm64.dmg`` |
+          | macOS, Intel | ``SiteWarden-$v-mac-x64.dmg`` |
+          | Linux (x64) | ``SiteWarden-$v-linux-x86_64.AppImage`` or ``SiteWarden-$v-linux-amd64.deb`` |
+
+          Each file has a matching ``.sha256``. The builds aren't code-signed yet; see the README's install section for the one-time steps on each OS.
+          "@ | Out-File -Encoding utf8 notes.md
+          gh release create $env:TAG --title "SiteWarden $v" --notes-file notes.md --verify-tag
+          exit $LASTEXITCODE
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest, flag: --win }
+          - { name: macos, os: macos-latest, flag: --mac }
+          - { name: linux, os: ubuntu-latest, flag: --linux }
     env:
-      TAG: ${{ github.event.inputs.tag || github.ref_name }}
-      GH_TOKEN: ${{ github.token }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,46 +86,22 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      - name: Tag must match package.json version
-        shell: pwsh
-        run: |
-          $v = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ("v$v" -ne $env:TAG) { throw "Tag $env:TAG does not match package.json version $v" }
-
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npx electron-builder --win --publish never
-
-      - name: Publish to GitHub release
+      - run: npx electron-builder ${{ matrix.flag }} --publish never
+      - name: Upload installers and checksums
         shell: pwsh
         run: |
-          $v = $env:TAG.TrimStart('v')
-          $exe = "release/SiteWarden-Setup-$v.exe"
-          if (-not (Test-Path $exe)) { throw "missing $exe" }
-          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  SiteWarden-Setup-$v.exe" | Out-File -Encoding ascii "$exe.sha256"
-
-          gh release view $env:TAG *> $null
-          if ($LASTEXITCODE -eq 0) {
-            # Release exists (e.g. written by hand): replace the installer, keep the notes.
-            gh release upload $env:TAG $exe "$exe.sha256" --clobber
-          } else {
-            # Notes: this version's CHANGELOG section plus the checksum.
-            $log = Get-Content CHANGELOG.md -Raw
-            $m = [regex]::Match($log, "(?ms)^## $([regex]::Escape($v))\b.*?(?=^## |\z)")
-            $section = if ($m.Success) { $m.Value.Trim() } else { "SiteWarden $v" }
-            @"
-          $section
-
-          ## Download
-
-          **SiteWarden-Setup-$v.exe** (Windows x64). SHA-256: ``$hash``
-
-          The installer isn't code-signed; if SmartScreen warns, choose More info > Run anyway.
-          "@ | Out-File -Encoding utf8 notes.md
-            gh release create $env:TAG $exe "$exe.sha256" --title "SiteWarden $v" --notes-file notes.md --verify-tag
+          $files = Get-ChildItem release -File | Where-Object { $_.Name -match '^SiteWarden-.*\.(exe|dmg|AppImage|deb)$' }
+          if (-not $files) { throw 'no installers found in release/' }
+          $upload = @()
+          foreach ($f in $files) {
+            $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($f.Name)" | Out-File -Encoding ascii "$($f.FullName).sha256"
+            $upload += $f.FullName, "$($f.FullName).sha256"
+            "**$($f.Name)**: SHA-256 ``$h``" >> $env:GITHUB_STEP_SUMMARY
           }
-          "Published $env:TAG, SHA-256 ``$hash``" >> $env:GITHUB_STEP_SUMMARY
+          gh release upload $env:TAG @upload --clobber
+          exit $LASTEXITCODE

@@ -4,11 +4,13 @@ SiteWarden is built so that **nobody but you holds your credentials or your data
 
 ## What is stored where
 
-| Data | Location | Protection |
+The app data folder is `%APPDATA%\SiteWarden` on Windows, `~/Library/Application Support/SiteWarden` on macOS and `~/.config/SiteWarden` on Linux.
+
+| Data | Location (in the app data folder) | Protection |
 |---|---|---|
-| Domains, scan history, settings, Cloudflare change log | `%APPDATA%\sitewarden\sitewarden.db` (SQLite) | your OS account |
-| API keys, Cloudflare token, agent and VM tokens, webhook URL | `%APPDATA%\sitewarden\sitewarden-keys.json` | each value encrypted with Electron `safeStorage` (Windows DPAPI, macOS Keychain, Linux libsecret). If OS encryption is unavailable, keys aren't saved. |
-| Nuclei, templates, private Java | `%APPDATA%\sitewarden\tools\` | checksum-verified on download |
+| Domains, scan history, settings, Cloudflare change log | `sitewarden.db` (SQLite) | your OS account |
+| API keys, Cloudflare token, agent and VM tokens, webhook URL | `sitewarden-keys.json` (file mode 0600) | each value encrypted with Electron `safeStorage` (Windows DPAPI, macOS Keychain, GNOME Keyring/KWallet on Linux). If no real key store is available, including Linux's hard-coded "basic_text" fallback, keys aren't saved. |
+| Nuclei, templates, private Java | `tools/` | checksum-verified on download |
 | Monitoring data (checks, scripts seen, CSP reports, alerts, VM results) | D1 database in **your** Cloudflare account | Cloudflare account security; read with the agent token |
 
 Plaintext keys never reach the app's window (renderer): it only learns whether a key is set. The window runs sandboxed with context isolation, a strict Content-Security-Policy, and no navigation to other sites.
@@ -49,7 +51,7 @@ Tokens are compared in constant time. Rotate the VM token from the Oracle agent 
 
 - SiteWarden looks at your site from the **outside**. It doesn't inspect server files, so malware that isn't yet visible in pages can be missed.
 - Free API tiers (Safe Browsing, VirusTotal) are licensed for non-commercial use. Check their terms for commercial sites.
-- 0.1.0 installers aren't code-signed.
+- Installers aren't code-signed yet. macOS builds are ad-hoc signed but not notarized.
 
 ## Reporting a vulnerability
 

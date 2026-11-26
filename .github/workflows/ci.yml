@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     env:
       SITEWARDEN_SKIP_ELECTRON: '1'
     steps:
@@ -37,9 +37,18 @@ jobs:
       - run: npm test
 
   package:
-    name: Package Windows installer
+    name: Package (${{ matrix.name }})
     needs: test
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows, os: windows-latest, flag: --win }
+          - { name: macos, os: macos-latest, flag: --mac }
+          - { name: linux, os: ubuntu-latest, flag: --linux }
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false' # no signing certificates in CI yet
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -48,20 +57,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win --publish never
-      - name: Checksum
+      - run: npx electron-builder ${{ matrix.flag }} --publish never
+      - name: Checksums
         shell: pwsh
         run: |
-          $f = Get-ChildItem release -Filter 'SiteWarden-Setup-*.exe' | Select-Object -First 1
-          if (-not $f) { throw 'installer not found' }
-          $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
-          "$h  $($f.Name)" | Out-File -Encoding ascii "$($f.FullName).sha256"
-          "**$($f.Name)**: $([math]::Round($f.Length / 1MB, 1)) MB, SHA-256 ``$h``" >> $env:GITHUB_STEP_SUMMARY
+          $files = Get-ChildItem release -File | Where-Object { $_.Name -match '^SiteWarden-.*\.(exe|dmg|AppImage|deb)$' }
+          if (-not $files) { throw 'no installers found in release/' }
+          foreach ($f in $files) {
+            $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            "$h  $($f.Name)" | Out-File -Encoding ascii "$($f.FullName).sha256"
+            "**$($f.Name)**: $([math]::Round($f.Length / 1MB, 1)) MB, SHA-256 ``$h``" >> $env:GITHUB_STEP_SUMMARY
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: SiteWarden-installer-${{ github.sha }}
+          name: SiteWarden-${{ matrix.name }}-${{ github.sha }}
           path: |
-            release/SiteWarden-Setup-*.exe
-            release/SiteWarden-Setup-*.exe.sha256
+            release/SiteWarden-*.exe
+            release/SiteWarden-*.dmg
+            release/SiteWarden-*.AppImage
+            release/SiteWarden-*.deb
+            release/SiteWarden-*.sha256
           retention-days: 7
           if-no-files-found: error
