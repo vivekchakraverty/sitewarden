@@ -192,6 +192,17 @@ function registerIpc(): void {
   })
 }
 
+// One instance only: a second launch focuses the existing window (two copies would share one database).
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  })
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('app.sitewarden.desktop')
   app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
