@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-26)
 
 ### Added
 - macOS (`.dmg` for Apple Silicon and Intel) and Linux (`.AppImage`, `.deb`) packages, built by CI on each OS.
@@ -35,5 +35,5 @@ First public release.
 - cloud-init for an Oracle Cloud Always Free VM (or any Linux + Docker) that runs scheduled Nuclei + ZAP scans and reports through your Worker. Outbound-only, with a separate limited token.
 
 ### Known limitations
-- The Windows installer isn't code-signed; no macOS or Linux packages yet.
+- The Windows installer isn't code-signed; no macOS or Linux packages (added in 0.2.0).
 - Cloudflare and Oracle features are tested against mocked APIs but not yet against live accounts.

@@ -1,6 +1,6 @@
 {
   "name": "sitewarden",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bring-your-own-key website security scanner: quick checks, malware/blacklist lookups, Nuclei + ZAP deep scans, Cloudflare hardening and 24/7 monitoring.",
   "author": {
     "name": "Vivek Chakraverty"

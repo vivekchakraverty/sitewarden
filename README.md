@@ -4,7 +4,7 @@
 
 SiteWarden checks a website you own for common security problems. It tells you in plain language what's wrong and gives you copy-paste fixes for Nginx, Apache, Cloudflare, WordPress and more. Each user brings their own API keys and accounts, so there is no SiteWarden server and no subscription, and nobody else holds your credentials.
 
-> **Status: 0.1.0, early release.** It works end to end on Windows. The Cloudflare and Oracle features have been tested against mocked APIs but not yet against real accounts. Please [report issues](https://github.com/vivekchakraverty/sitewarden/issues).
+> **Status: 0.2.0, early release.** It works end to end on Windows. macOS and Linux builds are new and lightly tested. The Cloudflare and Oracle features have been tested against mocked APIs but not yet against real accounts. Please [report issues](https://github.com/vivekchakraverty/sitewarden/issues).
 
 ## What it does
 
@@ -40,8 +40,6 @@ xattr -cr /Applications/SiteWarden.app
 **Linux:** SiteWarden stores keys in your desktop keyring (GNOME Keyring or KWallet). Without one it refuses to save keys instead of storing them weakly. On Ubuntu 24.04, use the `.deb`: AppImages can trip over Ubuntu's AppArmor sandbox rules.
 
 On first launch, SiteWarden downloads the deep-scan tools for your platform in the background (about 85 MB, checksum-verified). You can stop this and install them later from **Deep scanners**.
-
-> macOS and Linux packages start with the next release. 0.1.0 shipped for Windows only; until then, macOS and Linux can [run from source](docs/development.md).
 
 ## Quick start
 
